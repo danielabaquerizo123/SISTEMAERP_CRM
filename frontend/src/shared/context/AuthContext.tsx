@@ -1,0 +1,55 @@
+import { createContext, useState, useEffect, type ReactNode } from 'react';
+import type { User } from '@types/index';
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+}
+
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const MOCK_USERS: User[] = [
+  { id: '1', name: 'Admin Principal', email: 'admin@megamarket.com', role: 'Administrador', sucursal: 'Matriz Quito' },
+  { id: '2', name: 'Juan Pérez', email: 'juan@megamarket.com', role: 'Gerente de Ventas', sucursal: 'Sucursal Centro' },
+  { id: '3', name: 'María García', email: 'maria@megamarket.com', role: 'Encargado de Inventario', sucursal: 'Sucursal Norte' },
+  { id: '4', name: 'Carlos López', email: 'carlos@megamarket.com', role: 'Atención al Cliente', sucursal: 'Sucursal Sur' },
+  { id: '5', name: 'Ana Martínez', email: 'ana@megamarket.com', role: 'Contador', sucursal: 'Matriz Quito' },
+];
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('megamarket_user');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch {
+        localStorage.removeItem('megamarket_user');
+      }
+    }
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const found = MOCK_USERS.find((u) => u.email === email);
+    if (found && password === '123456') {
+      localStorage.setItem('megamarket_user', JSON.stringify(found));
+      setUser(found);
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    localStorage.removeItem('megamarket_user');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}

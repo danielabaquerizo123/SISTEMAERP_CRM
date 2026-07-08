@@ -1,0 +1,348 @@
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search,
+  Plus,
+  ShoppingBag,
+  Edit2,
+  Trash2,
+  Eye,
+  X,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+} from 'lucide-react';
+import type { Venta } from '@types/index';
+
+const initialVentas: Venta[] = [
+  { id: '1', numero: 'V-2024-001', cliente: 'Juan Pérez', identificacion: '1712345678', fecha: '2026-07-05', items: 5, subtotal: 45.50, impuesto: 5.46, total: 50.96, metodoPago: 'Efectivo', sucursal: 'Matriz Quito', estado: 'completada' },
+  { id: '2', numero: 'V-2024-002', cliente: 'María López', identificacion: '1723456789', fecha: '2026-07-05', items: 3, subtotal: 28.00, impuesto: 3.36, total: 31.36, metodoPago: 'Tarjeta', sucursal: 'Sucursal Norte', estado: 'completada' },
+  { id: '3', numero: 'V-2024-003', cliente: 'Carlos Gómez', identificacion: '1734567890', fecha: '2026-07-04', items: 8, subtotal: 112.30, impuesto: 13.48, total: 125.78, metodoPago: 'Transferencia', sucursal: 'Matriz Quito', estado: 'pendiente' },
+  { id: '4', numero: 'V-2024-004', cliente: 'Ana Martínez', identificacion: '1745678901', fecha: '2026-07-04', items: 2, subtotal: 15.60, impuesto: 1.87, total: 17.47, metodoPago: 'Efectivo', sucursal: 'Sucursal Sur', estado: 'completada' },
+  { id: '5', numero: 'V-2024-005', cliente: 'Pedro Sánchez', identificacion: '1756789012', fecha: '2026-07-03', items: 12, subtotal: 234.00, impuesto: 28.08, total: 262.08, metodoPago: 'Tarjeta', sucursal: 'Matriz Quito', estado: 'completada' },
+  { id: '6', numero: 'V-2024-006', cliente: 'José Ruiz', identificacion: '1767890123', fecha: '2026-07-03', items: 1, subtotal: 6.75, impuesto: 0.81, total: 7.56, metodoPago: 'Efectivo', sucursal: 'Sucursal Este', estado: 'anulada' },
+  { id: '7', numero: 'V-2024-007', cliente: 'Sofía Jiménez', identificacion: '1778901234', fecha: '2026-07-02', items: 6, subtotal: 89.20, impuesto: 10.70, total: 99.90, metodoPago: 'Transferencia', sucursal: 'Sucursal Oeste', estado: 'devuelta' },
+  { id: '8', numero: 'V-2024-008', cliente: 'Diego Mora', identificacion: '1789012345', fecha: '2026-07-02', items: 4, subtotal: 34.80, impuesto: 4.18, total: 38.98, metodoPago: 'Tarjeta', sucursal: 'Matriz Quito', estado: 'completada' },
+  { id: '9', numero: 'V-2024-009', cliente: 'Valeria Castro', identificacion: '1790123456', fecha: '2026-07-01', items: 7, subtotal: 156.00, impuesto: 18.72, total: 174.72, metodoPago: 'Efectivo', sucursal: 'Sucursal Norte', estado: 'pendiente' },
+  { id: '10', numero: 'V-2024-010', cliente: 'Andrés Vega', identificacion: '1701234567', fecha: '2026-07-01', items: 9, subtotal: 198.50, impuesto: 23.82, total: 222.32, metodoPago: 'Transferencia', sucursal: 'Matriz Quito', estado: 'completada' },
+  { id: '11', numero: 'V-2024-011', cliente: 'Gabriela Paz', identificacion: '1712345670', fecha: '2026-06-30', items: 3, subtotal: 22.40, impuesto: 2.69, total: 25.09, metodoPago: 'Tarjeta', sucursal: 'Sucursal Sur', estado: 'anulada' },
+  { id: '12', numero: 'V-2024-012', cliente: 'Roberto Sánchez', identificacion: '1723456780', fecha: '2026-06-30', items: 15, subtotal: 345.00, impuesto: 41.40, total: 386.40, metodoPago: 'Efectivo', sucursal: 'Sucursal Este', estado: 'completada' },
+];
+
+const estados = ['completada', 'pendiente', 'anulada', 'devuelta'] as const;
+const metodosPago = ['Efectivo', 'Tarjeta', 'Transferencia'];
+const sucursales = ['Matriz Quito', 'Sucursal Norte', 'Sucursal Sur', 'Sucursal Este', 'Sucursal Oeste'];
+const ROWS_PER_PAGE = 10;
+
+const estadoBadge = (estado: string) => {
+  const map: Record<string, { label: string; class: string }> = {
+    completada: { label: 'Completada', class: 'bg-success/10 text-success border-success/20' },
+    pendiente: { label: 'Pendiente', class: 'bg-warning/10 text-warning border-warning/20' },
+    anulada: { label: 'Anulada', class: 'bg-error/10 text-error border-error/20' },
+    devuelta: { label: 'Devuelta', class: 'bg-info/10 text-info border-info/20' },
+  };
+  return map[estado] || map.pendiente;
+};
+
+export default function VentasPage() {
+  const [search, setSearch] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('');
+  const [metodoFilter, setMetodoFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<Venta | null>(null);
+  const [showDelete, setShowDelete] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [items, setItems] = useState<Venta[]>(initialVentas);
+  const [formData, setFormData] = useState({ numero: '', cliente: '', identificacion: '', fecha: '', subtotal: 0, impuesto: 0, metodoPago: '', sucursal: '' });
+
+  const filtered = useMemo(() => {
+    return items.filter((v) => {
+      if (search && !v.numero.toLowerCase().includes(search.toLowerCase()) && !v.cliente.toLowerCase().includes(search.toLowerCase())) return false;
+      if (estadoFilter && v.estado !== estadoFilter) return false;
+      if (metodoFilter && v.metodoPago !== metodoFilter) return false;
+      return true;
+    });
+  }, [search, estadoFilter, metodoFilter, items]);
+
+  const totalPages = Math.ceil(filtered.length / ROWS_PER_PAGE);
+  const paginated = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      if (editingItem) {
+        setItems(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...formData } : p));
+      } else {
+        setItems(prev => [...prev, { id: crypto.randomUUID(), ...formData, items: 0, total: Number(formData.subtotal) + Number(formData.impuesto), estado: 'completada' }]);
+      }
+      setSaving(false);
+      setShowModal(false);
+      setEditingItem(null);
+      setSuccessMsg(editingItem ? 'Venta actualizada exitosamente' : 'Venta creada exitosamente');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }, 500);
+  };
+
+  const handleDelete = (id: string) => {
+    setItems(prev => prev.filter(p => p.id !== id));
+    setShowDelete(null);
+    setSuccessMsg('Venta eliminada exitosamente');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const openEdit = (item: Venta) => {
+    setEditingItem(item);
+    setFormData({ numero: item.numero, cliente: item.cliente, identificacion: item.identificacion, fecha: item.fecha, subtotal: item.subtotal, impuesto: item.impuesto, metodoPago: item.metodoPago, sucursal: item.sucursal });
+    setShowModal(true);
+  };
+
+  const openCreate = () => {
+    setEditingItem(null);
+    setFormData({ numero: '', cliente: '', identificacion: '', fecha: '', subtotal: 0, impuesto: 0, metodoPago: '', sucursal: '' });
+    setShowModal(true);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Ventas</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Registro de ventas y transacciones</p>
+        </div>
+        <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors shadow-sm shadow-primary-500/20">
+          <Plus className="w-4 h-4" />
+          Nueva Venta
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar por número o cliente..."
+            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary placeholder:text-text-secondary/40 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={estadoFilter} onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }} className="px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+            <option value="">Todos los estados</option>
+            {estados.map((e) => <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>)}
+          </select>
+          <select value={metodoFilter} onChange={(e) => { setMetodoFilter(e.target.value); setPage(1); }} className="px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+            <option value="">Todos los métodos</option>
+            {metodosPago.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border bg-gray-50/50">
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Número</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Cliente</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Fecha</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Items</th>
+                <th className="text-right px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Total</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Método Pago</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Estado</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {paginated.map((item) => (
+                <motion.tr
+                  key={item.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="hover:bg-gray-50/50 transition-colors"
+                >
+                  <td className="px-4 py-3.5 text-sm font-mono font-medium text-primary-500">{item.numero}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <ShoppingBag className="w-4 h-4 text-primary-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">{item.cliente}</p>
+                        <p className="text-xs text-text-secondary">{item.identificacion}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary">{item.fecha}</td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary text-center">{item.items}</td>
+                  <td className="px-4 py-3.5 text-sm font-semibold text-text-primary text-right">${item.total.toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary text-center">{item.metodoPago}</td>
+                  <td className="px-4 py-3.5 text-center">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${estadoBadge(item.estado).class}`}>
+                      {estadoBadge(item.estado).label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-all" title="Ver">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-all" title="Editar">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setShowDelete(item.id)} className="p-1.5 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all" title="Eliminar">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-text-secondary">
+                    <ShoppingBag className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm font-medium">No se encontraron ventas</p>
+                    <p className="text-xs mt-0.5">Intenta ajustar los filtros o crea una nueva venta</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <p className="text-sm text-text-secondary">
+              Mostrando {(page - 1) * ROWS_PER_PAGE + 1}-{Math.min(page * ROWS_PER_PAGE, filtered.length)} de {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                Anterior
+              </button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                const p = start + i;
+                if (p > totalPages) return null;
+                return (
+                  <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${page === p ? 'bg-primary-500 text-white' : 'text-text-secondary hover:bg-gray-100'}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <motion.div key="modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowModal(false)} />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-text-primary">{editingItem ? 'Editar Venta' : 'Nueva Venta'}</h3>
+                <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg text-text-secondary hover:bg-gray-100 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Número</label>
+                    <input value={formData.numero} onChange={(e) => setFormData({...formData, numero: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Ej: V-2024-XXX" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Cliente</label>
+                    <input value={formData.cliente} onChange={(e) => setFormData({...formData, cliente: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Nombre del cliente" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Identificación</label>
+                    <input value={formData.identificacion} onChange={(e) => setFormData({...formData, identificacion: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="0000000000" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Fecha</label>
+                    <input type="date" value={formData.fecha} onChange={(e) => setFormData({...formData, fecha: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Subtotal</label>
+                    <input type="number" value={formData.subtotal} onChange={(e) => setFormData({...formData, subtotal: Number(e.target.value)})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="0.00" step="0.01" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Impuesto</label>
+                    <input type="number" value={formData.impuesto} onChange={(e) => setFormData({...formData, impuesto: Number(e.target.value)})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="0.00" step="0.01" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Método de Pago</label>
+                    <select value={formData.metodoPago} onChange={(e) => setFormData({...formData, metodoPago: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+                      <option value="">Seleccionar</option>
+                      {metodosPago.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Sucursal</label>
+                    <select value={formData.sucursal} onChange={(e) => setFormData({...formData, sucursal: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+                      <option value="">Seleccionar</option>
+                      {sucursales.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-gray-50/50">
+                <button onClick={() => setShowModal(false)} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-gray-100 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={saving} className="px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center gap-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {saving ? 'Guardando...' : editingItem ? 'Actualizar Venta' : 'Crear Venta'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDelete && (
+          <motion.div key="delete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowDelete(null)} />
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-error" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">¿Eliminar venta?</h3>
+              <p className="text-sm text-text-secondary mb-6">Esta acción no se puede deshacer. La venta será eliminada permanentemente.</p>
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={() => setShowDelete(null)} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-gray-100 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={() => handleDelete(showDelete)} className="px-4 py-2.5 rounded-lg bg-error text-white text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div key="toast" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg bg-success text-white text-sm font-medium shadow-lg">
+            <CheckCircle className="w-4 h-4" />
+            {successMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

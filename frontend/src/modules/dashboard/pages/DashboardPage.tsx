@@ -1,0 +1,393 @@
+import { useContext, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  DollarSign,
+  TrendingUp,
+  ShoppingCart,
+  AlertTriangle,
+  PackageX,
+  Users,
+  UserCheck,
+  MessageSquareWarning,
+  ClipboardList,
+  Truck,
+  Building2,
+  Warehouse,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronRight,
+  ShoppingBag,
+  Receipt,
+  BarChart3,
+  PieChart,
+  Star,
+  Headphones,
+} from 'lucide-react';
+import { AuthContext } from '@shared/context/AuthContext';
+import { mockDashboardMetrics, mockDashboardCharts } from '../data/mockData';
+import type { Actividad } from '@types/index';
+
+function useCounter(target: number, duration = 1500) {
+  return target;
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+}
+
+function formatNumber(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toString();
+}
+
+interface StatCardProps {
+  title: string;
+  value: number | string;
+  change: number;
+  icon: React.ElementType;
+  format?: 'currency' | 'number' | 'integer';
+  color: 'red' | 'green' | 'amber' | 'blue' | 'purple' | 'teal';
+}
+
+function StatCard({ title, value, change, icon: Icon, format: fmt = 'number', color }: StatCardProps) {
+  const colors = {
+    red: 'from-red-500 to-red-600 bg-red-50 text-red-600 border-red-100',
+    green: 'from-green-500 to-green-600 bg-green-50 text-green-600 border-green-100',
+    amber: 'from-amber-500 to-amber-600 bg-amber-50 text-amber-600 border-amber-100',
+    blue: 'from-blue-500 to-blue-600 bg-blue-50 text-blue-600 border-blue-100',
+    purple: 'from-purple-500 to-purple-600 bg-purple-50 text-purple-600 border-purple-100',
+    teal: 'from-teal-500 to-teal-600 bg-teal-50 text-teal-600 border-teal-100',
+  };
+
+  const c = colors[color];
+  const displayValue = useMemo(() => {
+    if (typeof value === 'string') return value;
+    if (fmt === 'currency') return formatCurrency(value);
+    if (fmt === 'integer') return Math.round(value).toLocaleString('es-EC');
+    return formatNumber(value);
+  }, [value, fmt]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-xl border border-border p-5 hover:shadow-md transition-all duration-300"
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className={`w-10 h-10 rounded-lg ${c.split(' ')[3]} flex items-center justify-center`}>
+          <Icon className={`w-5 h-5 ${c.split(' ')[4]}`} />
+        </div>
+        <div className={`flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${
+          change >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+        }`}>
+          {change >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+          <span>{Math.abs(change)}%</span>
+        </div>
+      </div>
+      <p className="text-xs text-text-secondary mb-0.5">{title}</p>
+      <p className="text-2xl font-bold text-text-primary tracking-tight">{displayValue}</p>
+    </motion.div>
+  );
+}
+
+const activityIcons: Record<Actividad['tipo'], React.ElementType> = {
+  venta: ShoppingBag,
+  compra: Truck,
+  ticket: Headphones,
+  reclamo: MessageSquareWarning,
+  cliente: Users,
+  inventario: PackageX,
+};
+
+const activityColors: Record<Actividad['tipo'], string> = {
+  venta: 'text-green-600 bg-green-50',
+  compra: 'text-blue-600 bg-blue-50',
+  ticket: 'text-amber-600 bg-amber-50',
+  reclamo: 'text-red-600 bg-red-50',
+  cliente: 'text-purple-600 bg-purple-50',
+  inventario: 'text-teal-600 bg-teal-50',
+};
+
+export default function DashboardPage() {
+  const auth = useContext(AuthContext);
+  const metrics = mockDashboardMetrics;
+  const charts = mockDashboardCharts;
+
+  const hora = new Date().getHours();
+  const saludo = hora < 12 ? 'Buenos días' : hora < 18 ? 'Buenas tardes' : 'Buenas noches';
+  const userName = auth?.user?.name || 'Usuario';
+
+  const totalVentas = charts.ventasSucursales.reduce((s, v) => s + v.ventas, 0);
+  const totalMetas = charts.ventasSucursales.reduce((s, v) => s + v.meta, 0);
+
+  const maxVentas = Math.max(...charts.ventasCategoria.map((c) => c.ventas));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {saludo}, {userName}
+          </h1>
+          <p className="text-sm text-text-secondary mt-0.5">
+            {new Date().toLocaleDateString('es-EC', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select className="px-3 py-2 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500">
+            <option>Últimos 7 días</option>
+            <option>Últimos 30 días</option>
+            <option>Últimos 90 días</option>
+            <option>Este año</option>
+          </select>
+          <Link to="/reportes-erp" className="px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors flex items-center gap-2 shadow-sm shadow-primary-500/20">
+            <BarChart3 className="w-4 h-4" />
+            Generar Reporte
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+        <StatCard title="Ventas del día" value={metrics.ventasDia.valor} change={metrics.ventasDia.cambio} icon={DollarSign} format="currency" color="red" />
+        <StatCard title="Ventas del mes" value={metrics.ventasMes.valor} change={metrics.ventasMes.cambio} icon={TrendingUp} format="currency" color="green" />
+        <StatCard title="Compras pendientes" value={metrics.comprasPendientes.valor} change={metrics.comprasPendientes.cambio} icon={ShoppingCart} format="integer" color="amber" />
+        <StatCard title="Inventario crítico" value={metrics.inventarioCritico.valor} change={metrics.inventarioCritico.cambio} icon={AlertTriangle} format="integer" color="red" />
+        <StatCard title="Productos agotados" value={metrics.productosAgotados.valor} change={metrics.productosAgotados.cambio} icon={PackageX} format="integer" color="red" />
+        <StatCard title="Clientes registrados" value={metrics.clientesRegistrados.valor} change={metrics.clientesRegistrados.cambio} icon={Users} format="integer" color="blue" />
+        <StatCard title="Clientes atendidos" value={metrics.clientesAtendidos.valor} change={metrics.clientesAtendidos.cambio} icon={UserCheck} format="integer" color="green" />
+        <StatCard title="Reclamos abiertos" value={metrics.reclamosAbiertos.valor} change={metrics.reclamosAbiertos.cambio} icon={MessageSquareWarning} format="integer" color="amber" />
+        <StatCard title="Órdenes pendientes" value={metrics.ordenesPendientes.valor} change={metrics.ordenesPendientes.cambio} icon={ClipboardList} format="integer" color="blue" />
+        <StatCard title="Proveedores activos" value={metrics.proveedoresActivos.valor} change={metrics.proveedoresActivos.cambio} icon={Truck} format="integer" color="teal" />
+        <StatCard title="Sucursales" value={metrics.sucursales.valor} change={metrics.sucursales.cambio} icon={Building2} format="integer" color="purple" />
+        <StatCard title="Centros distribución" value={metrics.centrosDistribucion.valor} change={metrics.centrosDistribucion.cambio} icon={Warehouse} format="integer" color="teal" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl border border-border p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary">Ventas por Sucursal</h3>
+              <p className="text-xs text-text-secondary">Comparativa vs meta mensual</p>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-primary-500" />
+                <span className="text-text-secondary">Ventas</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-gray-200" />
+                <span className="text-text-secondary">Meta</span>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {charts.ventasSucursales.map((s, i) => {
+              const pctVentas = (s.ventas / maxVentas) * 100;
+              const pctMeta = (s.meta / maxVentas) * 100;
+              return (
+                <div key={s.sucursal}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-text-primary">{s.sucursal}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold text-text-primary">{formatCurrency(s.ventas)}</span>
+                      <span className={`text-xs font-medium ${s.crecimiento >= 0 ? 'text-success' : 'text-error'}`}>
+                        {s.crecimiento >= 0 ? '+' : ''}{s.crecimiento}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="relative h-7">
+                    <div className="absolute inset-0 rounded bg-gray-100" style={{ width: `${pctMeta}%` }} />
+                    <div className="absolute inset-0 rounded bg-primary-500" style={{ width: `${pctVentas}%`, opacity: 0.85 }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-sm">
+            <span className="text-text-secondary">Total: <strong className="text-text-primary">{formatCurrency(totalVentas)}</strong></span>
+            <span className="text-text-secondary">Meta: <strong className="text-text-primary">{formatCurrency(totalMetas)}</strong></span>
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl border border-border p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary">Ventas por Categoría</h3>
+              <p className="text-xs text-text-secondary">Distribución de ingresos</p>
+            </div>
+          </div>
+          <div className="space-y-3.5">
+            {charts.ventasCategoria.map((c) => {
+              const pct = (c.ventas / maxVentas) * 100;
+              return (
+                <div key={c.categoria}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-text-primary">{c.categoria}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-text-primary">{formatCurrency(c.ventas)}</span>
+                      <span className="text-xs text-text-secondary">({c.porcentaje}%)</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.8, delay: 0.2 }}
+                        className="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-600"
+                      />
+                    </div>
+                    <span className={`text-xs font-medium ${c.crecimiento >= 0 ? 'text-success' : 'text-error'}`}>
+                      {c.crecimiento >= 0 ? '+' : ''}{c.crecimiento}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl border border-border p-5 lg:col-span-1">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary">Top 5 Productos</h3>
+              <p className="text-xs text-text-secondary">Más vendidos del período</p>
+            </div>
+            <Link to="/productos" className="text-xs text-primary-500 hover:text-primary-600 font-medium flex items-center gap-0.5">
+              Ver todo <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {charts.topProductos.map((p, i) => (
+              <div key={p.codigo} className="flex items-center gap-3">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                  i === 0 ? 'bg-amber-100 text-amber-700' :
+                  i === 1 ? 'bg-gray-100 text-gray-600' :
+                  i === 2 ? 'bg-orange-100 text-orange-700' :
+                  'bg-gray-50 text-gray-500'
+                }`}>
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{p.producto}</p>
+                  <p className="text-xs text-text-secondary">{p.codigo} · {p.vendidos.toLocaleString()} vendidos</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-text-primary">{formatCurrency(p.ingresos)}</p>
+                  <p className={`text-xs ${p.crecimiento >= 0 ? 'text-success' : 'text-error'}`}>
+                    {p.crecimiento >= 0 ? '+' : ''}{p.crecimiento}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl border border-border p-5 lg:col-span-1">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-text-primary">Actividad Reciente</h3>
+              <p className="text-xs text-text-secondary">Últimos movimientos</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {charts.actividadReciente.slice(0, 6).map((act, i) => {
+              const ActIcon = activityIcons[act.tipo];
+              return (
+                <motion.div
+                  key={act.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-start gap-3 px-2 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${activityColors[act.tipo]}`}>
+                    <ActIcon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-text-primary leading-snug">{act.descripcion}</p>
+                    <p className="text-xs text-text-secondary mt-0.5">
+                      {act.usuario} · {act.sucursal}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-text-secondary">{act.hora}</p>
+                    <p className="text-[10px] text-text-secondary/50">{act.fecha}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-4 lg:col-span-1">
+          <div className="bg-white rounded-xl border border-border p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-base font-semibold text-text-primary">Alertas de Stock</h3>
+                <p className="text-xs text-text-secondary">Productos con inventario crítico</p>
+              </div>
+              <Link to="/inventario" className="text-xs text-primary-500 hover:text-primary-600 font-medium flex items-center gap-0.5">
+                Gestionar <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {[
+                { nombre: 'Arroz Superior 1kg', codigo: 'ARR-001', stock: 150, minimo: 500, sucursal: 'Sucursal Norte' },
+                { nombre: 'Aceite Vegetal 900ml', codigo: 'ACE-002', stock: 80, minimo: 300, sucursal: 'Sucursal Sur' },
+                { nombre: 'Leche Entera 1L', codigo: 'LEC-004', stock: 45, minimo: 200, sucursal: 'Sucursal Este' },
+                { nombre: 'Azúcar Morena 2kg', codigo: 'AZU-003', stock: 120, minimo: 400, sucursal: 'Matriz Quito' },
+                { nombre: 'Pan Integral 500g', codigo: 'PAN-005', stock: 25, minimo: 100, sucursal: 'Sucursal Oeste' },
+              ].map((item) => {
+                const pct = Math.min((item.stock / item.minimo) * 100, 100);
+                const critical = pct < 25;
+                return (
+                  <div key={item.codigo} className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${critical ? 'bg-error' : pct < 50 ? 'bg-warning' : 'bg-success'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">{item.nombre}</p>
+                      <p className="text-xs text-text-secondary">{item.codigo} · {item.sucursal}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-semibold ${critical ? 'text-error' : pct < 50 ? 'text-warning' : 'text-success'}`}>
+                        {item.stock}
+                      </p>
+                      <p className="text-[10px] text-text-secondary">mín: {item.minimo}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-border p-5">
+            <h3 className="text-base font-semibold text-text-primary mb-4">Acceso Rápido</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Nueva Venta', icon: ShoppingBag, path: '/ventas', color: 'bg-primary-50 text-primary-600 hover:bg-primary-100' },
+                { label: 'Nueva Compra', icon: ShoppingCart, path: '/compras', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+                { label: 'Inventario', icon: Warehouse, path: '/inventario', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+                { label: 'Facturación', icon: Receipt, path: '/facturacion', color: 'bg-green-50 text-green-600 hover:bg-green-100' },
+                { label: 'Clientes CRM', icon: Users, path: '/crm/clientes', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
+                { label: 'Reportes', icon: PieChart, path: '/reportes-erp', color: 'bg-teal-50 text-teal-600 hover:bg-teal-100' },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.path}
+                  className={`flex items-center gap-2 px-3 py-3 rounded-lg text-sm font-medium transition-all ${item.color}`}
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,346 @@
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search,
+  Plus,
+  FileText,
+  Edit2,
+  Trash2,
+  Eye,
+  X,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+} from 'lucide-react';
+import type { OrdenCompra } from '@types/index';
+
+const initialOrdenes: OrdenCompra[] = [
+  { id: '1', numero: 'OC-2024-001', proveedor: 'Distribuidora Nacional S.A.', fechaEmision: '2026-07-05', fechaEntrega: '2026-07-15', items: 15, total: 1400.00, sucursal: 'Matriz Quito', estado: 'aprobada' },
+  { id: '2', numero: 'OC-2024-002', proveedor: 'Alimentos del Ecuador Cía. Ltda.', fechaEmision: '2026-07-04', fechaEntrega: '2026-07-14', items: 8, total: 997.36, sucursal: 'Sucursal Norte', estado: 'pendiente' },
+  { id: '3', numero: 'OC-2024-003', proveedor: 'Lácteos del Valle', fechaEmision: '2026-07-03', fechaEntrega: '2026-07-13', items: 22, total: 2620.80, sucursal: 'Matriz Quito', estado: 'enviada' },
+  { id: '4', numero: 'OC-2024-004', proveedor: 'Carnes Selectas S.A.', fechaEmision: '2026-07-02', fechaEntrega: '2026-07-12', items: 6, total: 1747.20, sucursal: 'Sucursal Sur', estado: 'recibida' },
+  { id: '5', numero: 'OC-2024-005', proveedor: 'Bebidas del Pacífico', fechaEmision: '2026-07-02', fechaEntrega: '2026-07-16', items: 30, total: 5376.00, sucursal: 'Matriz Quito', estado: 'aprobada' },
+  { id: '6', numero: 'OC-2024-006', proveedor: 'Distribuidora Nacional S.A.', fechaEmision: '2026-07-01', fechaEntrega: '2026-07-11', items: 12, total: 1097.60, sucursal: 'Sucursal Este', estado: 'pendiente' },
+  { id: '7', numero: 'OC-2024-007', proveedor: 'Limpieza Total Cía.', fechaEmision: '2026-06-30', fechaEntrega: '2026-07-10', items: 10, total: 756.00, sucursal: 'Matriz Quito', estado: 'enviada' },
+  { id: '8', numero: 'OC-2024-008', proveedor: 'Frutas y Verduras Fresh', fechaEmision: '2026-06-29', fechaEntrega: '2026-07-09', items: 5, total: 470.40, sucursal: 'Sucursal Oeste', estado: 'recibida' },
+  { id: '9', numero: 'OC-2024-009', proveedor: 'Alimentos del Ecuador Cía. Ltda.', fechaEmision: '2026-06-28', fechaEntrega: '2026-07-08', items: 18, total: 2184.00, sucursal: 'Sucursal Norte', estado: 'cancelada' },
+  { id: '10', numero: 'OC-2024-010', proveedor: 'Panificadora Moderna', fechaEmision: '2026-06-27', fechaEntrega: '2026-07-07', items: 7, total: 380.80, sucursal: 'Sucursal Sur', estado: 'pendiente' },
+];
+
+const estados = ['pendiente', 'aprobada', 'enviada', 'recibida', 'cancelada'] as const;
+const sucursales = ['Matriz Quito', 'Sucursal Norte', 'Sucursal Sur', 'Sucursal Este', 'Sucursal Oeste'];
+const ROWS_PER_PAGE = 10;
+
+const estadoBadge = (estado: string) => {
+  const map: Record<string, { label: string; class: string }> = {
+    pendiente: { label: 'Pendiente', class: 'bg-warning/10 text-warning border-warning/20' },
+    aprobada: { label: 'Aprobada', class: 'bg-info/10 text-info border-info/20' },
+    enviada: { label: 'Enviada', class: 'bg-blue-100 text-blue-600 border-blue-200' },
+    recibida: { label: 'Recibida', class: 'bg-success/10 text-success border-success/20' },
+    cancelada: { label: 'Cancelada', class: 'bg-error/10 text-error border-error/20' },
+  };
+  return map[estado] || map.pendiente;
+};
+
+export default function OrdenesCompraPage() {
+  const [search, setSearch] = useState('');
+  const [estadoFilter, setEstadoFilter] = useState('');
+  const [sucursalFilter, setSucursalFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<OrdenCompra | null>(null);
+  const [showDelete, setShowDelete] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [items, setItems] = useState<OrdenCompra[]>(initialOrdenes);
+  const [formData, setFormData] = useState({ numero: '', proveedor: '', fechaEmision: '', fechaEntrega: '', items: 0, total: 0, sucursal: '', estado: 'pendiente' as OrdenCompra['estado'] });
+
+  const filtered = useMemo(() => {
+    return items.filter((o) => {
+      if (search && !o.numero.toLowerCase().includes(search.toLowerCase()) && !o.proveedor.toLowerCase().includes(search.toLowerCase())) return false;
+      if (estadoFilter && o.estado !== estadoFilter) return false;
+      if (sucursalFilter && o.sucursal !== sucursalFilter) return false;
+      return true;
+    });
+  }, [search, estadoFilter, sucursalFilter, items]);
+
+  const totalPages = Math.ceil(filtered.length / ROWS_PER_PAGE);
+  const paginated = filtered.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      if (editingItem) {
+        setItems(prev => prev.map(p => p.id === editingItem.id ? { ...p, ...formData } : p));
+      } else {
+        setItems(prev => [...prev, { id: crypto.randomUUID(), ...formData }]);
+      }
+      setSaving(false);
+      setShowModal(false);
+      setEditingItem(null);
+      setSuccessMsg(editingItem ? 'Orden actualizada exitosamente' : 'Orden creada exitosamente');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }, 500);
+  };
+
+  const handleDelete = (id: string) => {
+    setItems(prev => prev.filter(p => p.id !== id));
+    setShowDelete(null);
+    setSuccessMsg('Orden eliminada exitosamente');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const openEdit = (item: OrdenCompra) => {
+    setEditingItem(item);
+    setFormData({ numero: item.numero, proveedor: item.proveedor, fechaEmision: item.fechaEmision, fechaEntrega: item.fechaEntrega, items: item.items, total: item.total, sucursal: item.sucursal, estado: item.estado });
+    setShowModal(true);
+  };
+
+  const openCreate = () => {
+    setEditingItem(null);
+    setFormData({ numero: '', proveedor: '', fechaEmision: '', fechaEntrega: '', items: 0, total: 0, sucursal: '', estado: 'pendiente' });
+    setShowModal(true);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary">Órdenes de Compra</h1>
+          <p className="text-sm text-text-secondary mt-0.5">Gestión de órdenes de compra a proveedores</p>
+        </div>
+        <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors shadow-sm shadow-primary-500/20">
+          <Plus className="w-4 h-4" />
+          Nueva Orden
+        </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar por número o proveedor..."
+            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary placeholder:text-text-secondary/40 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <select value={estadoFilter} onChange={(e) => { setEstadoFilter(e.target.value); setPage(1); }} className="px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+            <option value="">Todos los estados</option>
+            {estados.map((e) => <option key={e} value={e}>{e.charAt(0).toUpperCase() + e.slice(1)}</option>)}
+          </select>
+          <select value={sucursalFilter} onChange={(e) => { setSucursalFilter(e.target.value); setPage(1); }} className="px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+            <option value="">Todas las sucursales</option>
+            {sucursales.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border bg-gray-50/50">
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Número</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Proveedor</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Emisión</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Entrega</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Items</th>
+                <th className="text-right px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Total</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Estado</th>
+                <th className="text-center px-4 py-3.5 text-xs font-semibold text-text-secondary uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {paginated.map((item) => (
+                <motion.tr
+                  key={item.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="hover:bg-gray-50/50 transition-colors"
+                >
+                  <td className="px-4 py-3.5 text-sm font-mono font-medium text-primary-500">{item.numero}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-primary-500" />
+                      </div>
+                      <span className="text-sm font-medium text-text-primary">{item.proveedor}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary">{item.fechaEmision}</td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary">{item.fechaEntrega}</td>
+                  <td className="px-4 py-3.5 text-sm text-text-secondary text-center">{item.items}</td>
+                  <td className="px-4 py-3.5 text-sm font-semibold text-text-primary text-right">${item.total.toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-center">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${estadoBadge(item.estado).class}`}>
+                      {estadoBadge(item.estado).label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center justify-center gap-1">
+                      <button className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-all" title="Ver">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-all" title="Editar">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setShowDelete(item.id)} className="p-1.5 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all" title="Eliminar">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-text-secondary">
+                    <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm font-medium">No se encontraron órdenes</p>
+                    <p className="text-xs mt-0.5">Intenta ajustar los filtros o crea una nueva orden</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <p className="text-sm text-text-secondary">
+              Mostrando {(page - 1) * ROWS_PER_PAGE + 1}-{Math.min(page * ROWS_PER_PAGE, filtered.length)} de {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                Anterior
+              </button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                const p = start + i;
+                if (p > totalPages) return null;
+                return (
+                  <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${page === p ? 'bg-primary-500 text-white' : 'text-text-secondary hover:bg-gray-100'}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-lg text-sm font-medium text-text-secondary hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <motion.div key="modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowModal(false)} />
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <h3 className="text-lg font-semibold text-text-primary">{editingItem ? 'Editar Orden' : 'Nueva Orden de Compra'}</h3>
+                <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg text-text-secondary hover:bg-gray-100 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Número</label>
+                    <input value={formData.numero} onChange={(e) => setFormData({...formData, numero: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Ej: OC-2024-XXX" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Proveedor</label>
+                    <input value={formData.proveedor} onChange={(e) => setFormData({...formData, proveedor: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="Nombre del proveedor" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Fecha de Emisión</label>
+                    <input type="date" value={formData.fechaEmision} onChange={(e) => setFormData({...formData, fechaEmision: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Fecha de Entrega</label>
+                    <input type="date" value={formData.fechaEntrega} onChange={(e) => setFormData({...formData, fechaEntrega: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Items</label>
+                    <input type="number" value={formData.items} onChange={(e) => setFormData({...formData, items: Number(e.target.value)})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Total</label>
+                    <input type="number" value={formData.total} onChange={(e) => setFormData({...formData, total: Number(e.target.value)})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all" placeholder="0.00" step="0.01" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Sucursal</label>
+                    <select value={formData.sucursal} onChange={(e) => setFormData({...formData, sucursal: e.target.value})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+                      <option value="">Seleccionar</option>
+                      {sucursales.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Estado</label>
+                    <select value={formData.estado} onChange={(e) => setFormData({...formData, estado: e.target.value as OrdenCompra['estado']})} className="w-full px-3 py-2.5 rounded-lg border border-border bg-white text-sm text-text-primary outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all">
+                      <option value="pendiente">Pendiente</option>
+                      <option value="aprobada">Aprobada</option>
+                      <option value="enviada">Enviada</option>
+                      <option value="recibida">Recibida</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-gray-50/50">
+                <button onClick={() => setShowModal(false)} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-gray-100 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={saving} className="px-4 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center gap-2">
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {saving ? 'Guardando...' : editingItem ? 'Actualizar Orden' : 'Crear Orden'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDelete && (
+          <motion.div key="delete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowDelete(null)} />
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+              <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-error" />
+              </div>
+              <h3 className="text-lg font-semibold text-text-primary mb-2">¿Eliminar orden de compra?</h3>
+              <p className="text-sm text-text-secondary mb-6">Esta acción no se puede deshacer. La orden será eliminada permanentemente.</p>
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={() => setShowDelete(null)} className="px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-gray-100 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={() => handleDelete(showDelete)} className="px-4 py-2.5 rounded-lg bg-error text-white text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {successMsg && (
+          <motion.div key="toast" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg bg-success text-white text-sm font-medium shadow-lg">
+            <CheckCircle className="w-4 h-4" />
+            {successMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

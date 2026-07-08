@@ -1,0 +1,363 @@
+import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { Users, UserPlus, UserCheck, UserX, TrendingUp, Star, Eye, Edit2, Trash2, Search, X, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import type { CRMReport } from '@types/index';
+
+const mockReport: CRMReport = {
+  metricas: {
+    totalClientes: 12580,
+    nuevosClientes: 345,
+    clientesActivos: 8940,
+    clientesPerdidos: 320,
+    tasaRetencion: 87.5,
+    satisfaccion: 4.3,
+    ticketsAbiertos: 23,
+    reclamosPendientes: 12,
+  },
+  ventasPorCliente: [
+    { cliente: 'Distribuidora Andina Cía. Ltda.', total: 185000, tendencia: 12.5 },
+    { cliente: 'Supermercados del Pacífico SA', total: 142000, tendencia: 8.3 },
+    { cliente: 'Comercializadora Quito SA', total: 98000, tendencia: -2.1 },
+    { cliente: 'Farmacias Saludable Cía. Ltda.', total: 87500, tendencia: 15.7 },
+    { cliente: 'Almacenes Cuenca Cía. Ltda.', total: 62300, tendencia: 5.4 },
+    { cliente: 'Mercagran S.A.', total: 52100, tendencia: -1.8 },
+    { cliente: 'Gabriela Alexandra Ruiz', total: 38400, tendencia: 22.3 },
+    { cliente: 'María Fernanda Gómez', total: 28900, tendencia: 3.2 },
+  ],
+  estadoTickets: [
+    { estado: 'Abiertos', cantidad: 23 },
+    { estado: 'En Proceso', cantidad: 15 },
+    { estado: 'Pendientes', cantidad: 8 },
+    { estado: 'Resueltos', cantidad: 42 },
+    { estado: 'Cerrados', cantidad: 67 },
+  ],
+  satisfaccionMensual: [
+    { mes: 'Febrero', valor: 4.1 },
+    { mes: 'Marzo', valor: 4.2 },
+    { mes: 'Abril', valor: 4.0 },
+    { mes: 'Mayo', valor: 4.3 },
+    { mes: 'Junio', valor: 4.5 },
+    { mes: 'Julio', valor: 4.3 },
+  ],
+};
+
+const clientesPorMes = [
+  { mes: 'Febrero', valor: 11200 },
+  { mes: 'Marzo', valor: 11500 },
+  { mes: 'Abril', valor: 11800 },
+  { mes: 'Mayo', valor: 12100 },
+  { mes: 'Junio', valor: 12400 },
+  { mes: 'Julio', valor: 12580 },
+];
+
+const summaryCards = [
+  { title: 'Total Clientes', value: mockReport.metricas.totalClientes.toLocaleString(), icon: Users, color: 'text-info', bg: 'bg-blue-50' },
+  { title: 'Nuevos', value: mockReport.metricas.nuevosClientes, icon: UserPlus, color: 'text-success', bg: 'bg-success-lighter' },
+  { title: 'Activos', value: mockReport.metricas.clientesActivos.toLocaleString(), icon: UserCheck, color: 'text-success', bg: 'bg-success-lighter' },
+  { title: 'Perdidos', value: mockReport.metricas.clientesPerdidos, icon: UserX, color: 'text-error', bg: 'bg-error-lighter' },
+  { title: 'Tasa Retención', value: `${mockReport.metricas.tasaRetencion}%`, icon: TrendingUp, color: 'text-info', bg: 'bg-blue-50' },
+  { title: 'Satisfacción', value: mockReport.metricas.satisfaccion.toFixed(1), icon: Star, color: 'text-yellow-500', bg: 'bg-amber-50' },
+];
+
+const estadoColors: Record<string, string> = {
+  Abiertos: '#2563EB',
+  'En Proceso': '#D97706',
+  Pendientes: '#D97706',
+  Resueltos: '#059669',
+  Cerrados: '#6B7280',
+};
+
+function ReportesCrmPage() {
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState<boolean>(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Partial<{ cliente: string; total: number; tendencia: number }>>({});
+
+  const maxClientesVal = Math.max(...clientesPorMes.map(c => c.valor));
+  const totalTickets = mockReport.estadoTickets.reduce((acc, t) => acc + t.cantidad, 0);
+
+  const filteredVentas = useMemo(() => {
+    if (!search) return mockReport.ventasPorCliente;
+    return mockReport.ventasPorCliente.filter(v =>
+      v.cliente.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search]);
+
+  const ITEMS_PER_PAGE = 5;
+  const totalPages = Math.ceil(filteredVentas.length / ITEMS_PER_PAGE);
+  const paginados = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredVentas.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredVentas, currentPage]);
+
+  const showToast = (message: string) => {
+    setToast({ visible: true, message });
+    setTimeout(() => setToast({ visible: false, message: '' }), 3000);
+  };
+
+  const abrirEditar = () => {
+    setEditando(true);
+    setForm({});
+    setModalOpen(true);
+  };
+
+  const guardar = () => {
+    setSaving(true);
+    setTimeout(() => {
+      setSaving(false);
+      setModalOpen(false);
+      showToast('Reporte actualizado exitosamente');
+    }, 1000);
+  };
+
+  const eliminar = () => {
+    setDeleteOpen(false);
+    showToast('Reporte eliminado exitosamente');
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <h1 className="text-2xl font-bold text-text-primary">Reportes CRM</h1>
+          <p className="text-text-secondary mt-1">Métricas y reportes de gestión de clientes</p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          {summaryCards.map((card, i) => (
+            <motion.div
+              key={card.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-white rounded-xl border border-border p-4"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-text-secondary uppercase tracking-wider">{card.title}</p>
+                <div className={`w-9 h-9 rounded-lg ${card.bg} flex items-center justify-center ${card.color}`}>
+                  <card.icon className="w-4 h-4" />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-text-primary">{card.value}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl border border-border p-5"
+          >
+            <h3 className="text-base font-semibold text-text-primary mb-4">Clientes por Mes</h3>
+            <div className="flex items-end justify-between gap-2 h-48">
+              {clientesPorMes.map((item, i) => (
+                <div key={item.mes} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                  <span className="text-xs text-text-secondary font-mono">{item.valor.toLocaleString()}</span>
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(item.valor / maxClientesVal) * 100}%` }}
+                    transition={{ delay: 0.4 + i * 0.1, duration: 0.6, ease: 'easeOut' }}
+                    className="w-full max-w-[48px] rounded-t-md bg-primary-500"
+                    style={{ minHeight: 8 }}
+                  />
+                  <span className="text-xs text-text-secondary">{item.mes.substring(0, 3)}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-white rounded-xl border border-border p-5"
+          >
+            <h3 className="text-base font-semibold text-text-primary mb-4">Distribución de Tickets</h3>
+            <div className="space-y-3">
+              {mockReport.estadoTickets.map(item => {
+                const pct = totalTickets > 0 ? (item.cantidad / totalTickets) * 100 : 0;
+                return (
+                  <div key={item.estado}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-text-primary">{item.estado}</span>
+                      <span className="text-sm text-text-secondary font-mono">{item.cantidad} ({pct.toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ delay: 0.5, duration: 0.8, ease: 'easeOut' }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: estadoColors[item.estado] || '#6B7280' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-white rounded-xl border border-border overflow-hidden"
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h3 className="text-base font-semibold text-text-primary">Top Clientes por Ventas</h3>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={search}
+                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                className="w-64 rounded-lg border border-border bg-white pl-10 pr-3 py-2 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-gray-50">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Cliente</th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Total Ventas</th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Tendencia</th>
+                  <th className="text-right px-5 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paginados.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-16 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center mb-3">
+                          <Search className="w-6 h-6 text-primary-500" />
+                        </div>
+                        <p className="text-sm text-text-secondary">No se encontraron clientes</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginados.map(v => (
+                    <tr key={v.cliente} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3 text-sm text-text-primary font-medium">{v.cliente}</td>
+                      <td className="px-5 py-3 text-sm text-text-secondary text-right font-mono">${v.total.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`inline-flex items-center gap-1 text-sm font-medium ${v.tendencia >= 0 ? 'text-success' : 'text-error'}`}>
+                          {v.tendencia >= 0 ? '+' : ''}{v.tendencia}%
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button className="p-2 rounded-lg text-text-secondary hover:bg-gray-100 hover:text-primary-500 transition-colors" title="Ver"><Eye className="w-4 h-4" /></button>
+                          <button onClick={abrirEditar} className="p-2 rounded-lg text-text-secondary hover:bg-gray-100 hover:text-primary-500 transition-colors" title="Editar"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => setDeleteOpen(true)} className="p-2 rounded-lg text-text-secondary hover:bg-gray-100 hover:text-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {filteredVentas.length > 0 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+              <span className="text-sm text-text-secondary">
+                Mostrando {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredVentas.length)}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredVentas.length)} de {filteredVentas.length}
+              </span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`inline-flex items-center justify-center min-w-[36px] h-9 px-2 rounded-lg border text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary-500 text-white border-primary-500' : 'border-border text-text-secondary hover:bg-gray-100'}`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      {/* Modal */}
+      {modalOpen && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-lg bg-white rounded-xl shadow-xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-0">
+              <h2 className="text-lg font-semibold text-text-primary">{editando ? 'Editar Reporte' : 'Nuevo Reporte'}</h2>
+              <button onClick={() => setModalOpen(false)} className="p-1 rounded-lg text-text-secondary hover:bg-gray-100 transition-colors"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="px-6 py-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">Cliente</label>
+                <input type="text" value={form.cliente || ''} onChange={e => setForm(prev => ({ ...prev, cliente: e.target.value }))} className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">Total Ventas</label>
+                  <input type="number" value={form.total || 0} onChange={e => setForm(prev => ({ ...prev, total: Number(e.target.value) }))} className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1">Tendencia (%)</label>
+                  <input type="number" value={form.tendencia || 0} onChange={e => setForm(prev => ({ ...prev, tendencia: Number(e.target.value) }))} className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-gray-100 transition-colors">Cancelar</button>
+              <button onClick={guardar} disabled={saving} className="inline-flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors disabled:opacity-50">
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {deleteOpen && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteOpen(false)} />
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-xl shadow-xl">
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-error-lighter flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6 text-error" />
+              </div>
+              <h2 className="text-lg font-semibold text-text-primary mb-2">Confirmar eliminación</h2>
+              <p className="text-sm text-text-secondary">¿Estás seguro de eliminar este reporte? Esta acción no se puede deshacer.</p>
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-center gap-3">
+              <button onClick={() => setDeleteOpen(false)} className="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-gray-100 transition-colors">Cancelar</button>
+              <button onClick={eliminar} className="px-4 py-2 rounded-lg bg-error text-white text-sm font-medium hover:bg-red-700 transition-colors">Eliminar</button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Toast */}
+      {toast.visible && (
+        <motion.div
+          initial={{ opacity: 0, x: 100, scale: 0.95 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: 100, scale: 0.95 }}
+          className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-white rounded-lg shadow-lg border border-border border-l-4 border-l-success px-4 py-3"
+        >
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0 text-success" />
+            <p className="flex-1 text-sm text-text-primary">{toast.message}</p>
+            <button onClick={() => setToast({ visible: false, message: '' })} className="p-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-gray-100 transition-colors flex-shrink-0"><X className="w-4 h-4" /></button>
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
+
+export default ReportesCrmPage;

@@ -1,0 +1,42 @@
+import { Router } from 'express';
+import authRoutes from '../modules/auth/authRoutes';
+import usersRoutes from '../modules/users/usersRoutes';
+import rolesRoutes from '../modules/roles/rolesRoutes';
+import clientesRoutes from '../modules/clientes/clientesRoutes';
+import proveedoresRoutes from '../modules/proveedores/proveedoresRoutes';
+import productosRoutes from '../modules/productos/productosRoutes';
+import categoriasRoutes from '../modules/categorias/categoriasRoutes';
+import inventarioRoutes from '../modules/inventario/inventarioRoutes';
+import comprasRoutes from '../modules/compras/comprasRoutes';
+import ventasRoutes from '../modules/ventas/ventasRoutes';
+import facturacionRoutes from '../modules/facturacion/facturacionRoutes';
+import ticketsRoutes from '../modules/crm/tickets/ticketsRoutes';
+import oportunidadesRoutes from '../modules/crm/oportunidades/oportunidadesRoutes';
+import cotizacionesRoutes from '../modules/crm/cotizaciones/cotizacionesRoutes';
+import actividadesRoutes from '../modules/crm/actividades/actividadesRoutes';
+import dashboardRoutes from '../modules/dashboard/dashboardRoutes';
+import configRoutes from '../modules/config/configRoutes';
+import reportesRoutes from '../modules/reportes/reportesRoutes';
+
+const router = Router();
+
+router.use('/auth', authRoutes);
+router.use('/users', usersRoutes);
+router.use('/roles', rolesRoutes);
+router.use('/clientes', clientesRoutes);
+router.use('/proveedores', proveedoresRoutes);
+router.use('/productos', productosRoutes);
+router.use('/categorias', categoriasRoutes);
+router.use('/inventario', inventarioRoutes);
+router.use('/compras', comprasRoutes);
+router.use('/ventas', ventasRoutes);
+router.use('/facturacion', facturacionRoutes);
+router.use('/crm/tickets', ticketsRoutes);
+router.use('/crm/oportunidades', oportunidadesRoutes);
+router.use('/crm/cotizaciones', cotizacionesRoutes);
+router.use('/crm/actividades', actividadesRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/config', configRoutes);
+router.use('/reportes', reportesRoutes);
+
+export default router;

@@ -1,0 +1,309 @@
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Plus, Edit2, Trash2, Eye, AlertTriangle, CheckCircle } from 'lucide-react';
+import type { User } from '@types/index';
+import Button from '@shared/components/ui/Button';
+import Modal from '@shared/components/ui/Modal';
+import EmptyState from '@shared/components/ui/EmptyState';
+import Input from '@shared/components/ui/Input';
+import Select from '@shared/components/ui/Select';
+
+interface UsuarioItem extends User {
+  estado: 'activo' | 'inactivo';
+  ultimoAcceso: string;
+}
+
+const ROLES = ['Administrador', 'Gerente de Ventas', 'Encargado de Inventario', 'Atención al Cliente', 'Contador', 'Supervisor', 'Cajero'];
+const SUCURSALES = ['Matriz Quito', 'Sucursal Norte', 'Sucursal Sur', 'Sucursal Este', 'Sucursal Oeste'];
+
+const INITIAL_USUARIOS: UsuarioItem[] = [
+  { id: '1', name: 'Admin Principal', email: 'admin@megamarket.com', role: 'Administrador', sucursal: 'Matriz Quito', estado: 'activo', ultimoAcceso: 'Hoy 15:30' },
+  { id: '2', name: 'María García', email: 'maria.garcia@megamarket.com', role: 'Gerente de Ventas', sucursal: 'Matriz Quito', estado: 'activo', ultimoAcceso: 'Hoy 14:15' },
+  { id: '3', name: 'Carlos López', email: 'carlos.lopez@megamarket.com', role: 'Encargado de Inventario', sucursal: 'Sucursal Norte', estado: 'activo', ultimoAcceso: '06/07/2026' },
+  { id: '4', name: 'Ana Martínez', email: 'ana.martinez@megamarket.com', role: 'Atención al Cliente', sucursal: 'Sucursal Sur', estado: 'activo', ultimoAcceso: '06/07/2026' },
+  { id: '5', name: 'Pedro Sánchez', email: 'pedro.sanchez@megamarket.com', role: 'Contador', sucursal: 'Matriz Quito', estado: 'activo', ultimoAcceso: '05/07/2026' },
+  { id: '6', name: 'Lucía Ramírez', email: 'lucia.ramirez@megamarket.com', role: 'Supervisor', sucursal: 'Sucursal Este', estado: 'inactivo', ultimoAcceso: '01/07/2026' },
+  { id: '7', name: 'Jorge Mendoza', email: 'jorge.mendoza@megamarket.com', role: 'Cajero', sucursal: 'Sucursal Oeste', estado: 'activo', ultimoAcceso: '06/07/2026' },
+  { id: '8', name: 'Diana Torres', email: 'diana.torres@megamarket.com', role: 'Cajero', sucursal: 'Sucursal Norte', estado: 'activo', ultimoAcceso: '06/07/2026' },
+  { id: '9', name: 'Roberto Andrade', email: 'roberto.andrade@megamarket.com', role: 'Encargado de Inventario', sucursal: 'Sucursal Sur', estado: 'inactivo', ultimoAcceso: '28/06/2026' },
+  { id: '10', name: 'Carmen Vega', email: 'carmen.vega@megamarket.com', role: 'Atención al Cliente', sucursal: 'Matriz Quito', estado: 'activo', ultimoAcceso: 'Hoy 10:00' },
+];
+
+const ITEMS_PER_PAGE = 5;
+
+const roleOptions = ROLES.map((r) => ({ value: r, label: r }));
+const sucursalOptions = SUCURSALES.map((s) => ({ value: s, label: s }));
+const estadoOptions = [
+  { value: 'activo', label: 'Activo' },
+  { value: 'inactivo', label: 'Inactivo' },
+];
+const filterRolOptions = [{ value: '', label: 'Todos los roles' }, ...roleOptions];
+const filterEstadoOptions = [{ value: '', label: 'Todos los estados' }, ...estadoOptions];
+
+export default function UsuariosPage() {
+  const [search, setSearch] = useState('');
+  const [filterRol, setFilterRol] = useState('');
+  const [filterEstado, setFilterEstado] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<UsuarioItem | null>(null);
+  const [deleteItem, setDeleteItem] = useState<UsuarioItem | null>(null);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [saving, setSaving] = useState(false);
+  const [items, setItems] = useState<UsuarioItem[]>(INITIAL_USUARIOS);
+
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formRole, setFormRole] = useState('');
+  const [formSucursal, setFormSucursal] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formEstado, setFormEstado] = useState<'activo' | 'inactivo'>('activo');
+
+  const filtered = useMemo(() => {
+    return items.filter((u) => {
+      const s = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
+      const r = !filterRol || u.role === filterRol;
+      const e = !filterEstado || u.estado === filterEstado;
+      return s && r && e;
+    });
+  }, [items, search, filterRol, filterEstado]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  const openCreate = () => {
+    setEditItem(null);
+    setFormName(''); setFormEmail(''); setFormRole(''); setFormSucursal(''); setFormPassword(''); setFormEstado('activo');
+    setModalOpen(true);
+  };
+
+  const openEdit = (item: UsuarioItem) => {
+    setEditItem(item);
+    setFormName(item.name); setFormEmail(item.email); setFormRole(item.role); setFormSucursal(item.sucursal || ''); setFormPassword(''); setFormEstado(item.estado);
+    setModalOpen(true);
+  };
+
+  const handleSave = () => {
+    setSaving(true);
+    setTimeout(() => {
+      if (editItem) {
+        setItems(prev => prev.map(p => p.id === editItem.id ? { ...p, name: formName, email: formEmail, role: formRole, sucursal: formSucursal, estado: formEstado } : p));
+      } else {
+        setItems(prev => [...prev, { id: crypto.randomUUID(), name: formName, email: formEmail, role: formRole, sucursal: formSucursal, estado: formEstado, ultimoAcceso: 'Ahora' }]);
+      }
+      setSaving(false);
+      setModalOpen(false);
+      setToast({ message: editItem ? 'Usuario actualizado exitosamente' : 'Usuario creado exitosamente', visible: true });
+      setTimeout(() => setToast({ message: '', visible: false }), 3000);
+    }, 500);
+  };
+
+  const handleDelete = () => {
+    if (deleteItem) setItems(prev => prev.filter(p => p.id !== deleteItem.id));
+    setDeleteItem(null);
+    setToast({ message: 'Usuario eliminado exitosamente', visible: true });
+    setTimeout(() => setToast({ message: '', visible: false }), 3000);
+  };
+
+  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, filtered.length);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary">Usuarios</h1>
+        <p className="text-sm text-text-secondary mt-1">Gestiona los usuarios del sistema MegaMarket</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            placeholder="Buscar usuario..."
+            className="w-full rounded-lg border border-border bg-white pl-10 pr-3 py-2.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+        <Select
+          options={filterRolOptions}
+          value={filterRol}
+          onChange={(e) => { setFilterRol(e.target.value); setCurrentPage(1); }}
+          className="min-w-[160px]"
+        />
+        <Select
+          options={filterEstadoOptions}
+          value={filterEstado}
+          onChange={(e) => { setFilterEstado(e.target.value); setCurrentPage(1); }}
+          className="min-w-[160px]"
+        />
+        <Button variant="primary" icon={Plus} onClick={openCreate}>
+          Nuevo
+        </Button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-border">
+          <EmptyState icon={Search} title="No se encontraron usuarios" description="Intenta ajustar los filtros o crea un nuevo usuario" />
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-border">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Usuario</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Rol</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Sucursal</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Último Acceso</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Estado</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-text-secondary uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {paginated.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-semibold">
+                          {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                        </div>
+                        <div>
+                          <p className="font-medium text-text-primary">{user.name}</p>
+                          <p className="text-xs text-text-secondary">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5 text-text-primary">{user.role}</td>
+                    <td className="px-4 py-3.5 text-text-primary">{user.sucursal}</td>
+                    <td className="px-4 py-3.5 text-text-secondary">{user.ultimoAcceso}</td>
+                    <td className="px-4 py-3.5">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                          user.estado === 'activo'
+                            ? 'bg-success/10 text-success border-success/20'
+                            : 'bg-gray-100 text-gray-500 border-gray-200'
+                        }`}
+                      >
+                        {user.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(user)}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-colors"
+                          title="Ver"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(user)}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-primary-500 hover:bg-primary-50 transition-colors"
+                          title="Editar"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteItem(user)}
+                          className="p-1.5 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <p className="text-sm text-text-secondary">
+              Mostrando {startItem}-{endItem} de {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`min-w-[36px] h-9 px-2 inline-flex items-center justify-center rounded-lg border text-sm font-medium transition-colors ${
+                    page === currentPage
+                      ? 'bg-primary-500 text-white border-primary-500'
+                      : 'border-border text-text-secondary hover:bg-gray-100'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editItem ? 'Editar Usuario' : 'Nuevo Usuario'}
+        size="lg"
+        footer={
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleSave} isLoading={saving}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input label="Nombre" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Nombre completo" />
+          <Input label="Email" type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="correo@ejemplo.com" />
+          <Select label="Rol" options={roleOptions} value={formRole} onChange={(e) => setFormRole(e.target.value)} placeholder="Seleccionar rol" />
+          <Select label="Sucursal" options={sucursalOptions} value={formSucursal} onChange={(e) => setFormSucursal(e.target.value)} placeholder="Seleccionar sucursal" />
+          <Input label="Contraseña" type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder={editItem ? 'Dejar vacío para mantener' : 'Contraseña'} />
+          <Select label="Estado" options={estadoOptions} value={formEstado} onChange={(e) => setFormEstado(e.target.value as 'activo' | 'inactivo')} />
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!deleteItem}
+        onClose={() => setDeleteItem(null)}
+        size="sm"
+        footer={
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => setDeleteItem(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={handleDelete}>Eliminar</Button>
+          </div>
+        }
+      >
+        <div className="text-center py-2">
+          <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-error" />
+          </div>
+          <h3 className="text-lg font-semibold text-text-primary mb-2">Confirmar Eliminación</h3>
+          <p className="text-sm text-text-secondary">
+            ¿Estás seguro de eliminar a <strong>{deleteItem?.name}</strong>? Esta acción no se puede deshacer.
+          </p>
+        </div>
+      </Modal>
+
+      <AnimatePresence>
+        {toast.visible && (
+          <motion.div key="toast"
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-success text-white px-5 py-3 rounded-lg shadow-lg"
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span className="text-sm font-medium">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
