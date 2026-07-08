@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2, Settings, Users, Upload, Save, Moon, Sun,
-  Bell, Mail, Globe, CalendarDays, Edit3, Trash2, ToggleLeft, ToggleRight,
+  Bell, Mail, Globe, Edit3, Trash2,
 } from 'lucide-react';
 import Button from '@shared/components/ui/Button';
 import Input from '@shared/components/ui/Input';

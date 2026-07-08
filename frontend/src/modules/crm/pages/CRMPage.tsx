@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, Calendar, Mail, CheckSquare, Users, Target, Headphones, DollarSign, Plus } from 'lucide-react';
@@ -27,15 +26,15 @@ const actividadColorMap = {
 };
 
 const etapaBadgeVariant = (etapa: string) => {
-  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'default'> = {
-    nueva: 'default',
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'error' | 'gray'> = {
+    nueva: 'gray',
     calificada: 'info',
     propuesta: 'warning',
     negociacion: 'primary',
     cerrada_ganada: 'success',
     cerrada_perdida: 'error',
   };
-  return map[etapa] ?? 'default';
+  return map[etapa] ?? 'gray';
 };
 
 const etapaLabelMap: Record<string, string> = {

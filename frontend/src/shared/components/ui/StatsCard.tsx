@@ -20,7 +20,8 @@ interface StatsCardProps {
 function useCounter(end: number, duration = 1.5, start = 0) {
   const [count, setCount] = useState(start);
   const ref = useRef<number>(start);
-  const inView = useInView({ once: true });
+  const refView = useRef<HTMLDivElement>(null);
+  const inView = useInView(refView);
 
   useEffect(() => {
     if (!inView) return;
@@ -64,14 +65,12 @@ export const StatsCard: React.FC<StatsCardProps> = ({
       ? parseFloat(rawValue.replace(/[$,]/g, ''))
       : rawValue;
 
-  const { display, inView: isVisible } = useCounter(
+  const { display } = useCounter(
     animated ? numericValue : 0,
     1.5
   );
 
-  const displayValue = animated
-    ? rawValue
-    : rawValue;
+  const displayValue = animated ? display : rawValue;
 
   const isTrendPositive = trend !== undefined && trend > 0;
   const isTrendNegative = trend !== undefined && trend < 0;
@@ -79,7 +78,6 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
   return (
     <motion.div
-      ref={useRef(null)}
       initial={{ opacity: 0, y: 24, scale: 0.95 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true }}

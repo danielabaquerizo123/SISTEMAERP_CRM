@@ -5,13 +5,12 @@ import {
   Search,
   Bell,
   User,
+  Users,
   ChevronDown,
   Menu,
   Settings,
   LogOut,
   ShoppingBag,
-  AlertTriangle,
-  Ticket,
   X,
 } from 'lucide-react';
 
