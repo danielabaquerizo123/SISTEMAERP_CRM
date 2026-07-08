@@ -4,6 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -21,5 +22,11 @@ export default defineConfig({
       '@modules': path.resolve(__dirname, './src/modules'),
       '@shared': path.resolve(__dirname, './src/shared'),
     },
+  },
+
+  preview: {
+    allowedHosts: [
+      'enchanting-comfort-production-901c.up.railway.app'
+    ],
   },
 })
